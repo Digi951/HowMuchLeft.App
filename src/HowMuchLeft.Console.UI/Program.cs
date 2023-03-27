@@ -1,10 +1,13 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using HowMuchLeft.ConsoleUI.Jobs;
 using System.Globalization;
+using HowMuchLeft.ConsoleUI.Configuration;
+using System.Reflection;
 
-using IHost host = CreateHostbuilder().Build();
+using IHost host = CreateHostbuilder(args).Build();
 using var scope = host.Services.CreateScope(); ;
 
 var services = scope.ServiceProvider;
@@ -18,18 +21,23 @@ catch (Exception ex)
     Console.WriteLine(ex.Message);
 }
 
-static IHostBuilder CreateHostbuilder()
+static IHostBuilder CreateHostbuilder(String[] args)
 {
     CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 
-    return Host.CreateDefaultBuilder()
+    return Host.CreateDefaultBuilder(args)
         .ConfigureAppConfiguration((hostingContext, config) =>
         {
-            config.SetBasePath(hostingContext.HostingEnvironment.ContentRootPath)
-            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+            var appAssembly = Assembly.Load(new AssemblyName(hostingContext.HostingEnvironment.ApplicationName));
+            var appPath = Path.GetDirectoryName(appAssembly.Location);
+
+            config.SetBasePath(appPath)
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+            .AddCommandLine(args);
         })
-        .ConfigureServices((_, services) =>
+        .ConfigureServices((hostingContext, services) =>
         {
-            services.AddSingleton<WorkTimeJob>();
+            services.AddSingleton<CommandLineOptions>(CommandLine.Parser.Default.ParseArguments<CommandLineOptions>(args).Value);
+            services.AddSingleton<WorkTimeJob>();            
         });
 }

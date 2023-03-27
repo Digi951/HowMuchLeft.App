@@ -1,64 +1,63 @@
-﻿using HowMuchLeft.ConsoleUI.Models;
+﻿using HowMuchLeft.ConsoleUI.Configuration;
+using HowMuchLeft.ConsoleUI.Enums;
+using HowMuchLeft.ConsoleUI.Extensions;
+using HowMuchLeft.ConsoleUI.Models;
+using HowMuchLeft.ConsoleUI.Renderer;
 using Microsoft.Extensions.Configuration;
+using System.Globalization;
 
 namespace HowMuchLeft.ConsoleUI.Jobs;
-public class WorkTimeJob
+public sealed class WorkTimeJob
 {
     private readonly IConfiguration _config;
     private readonly double _workTime;
     private readonly double _breakTime;
     private readonly double _necessaryBreakAfterTime;
-    private DateTime _startTime;
+    private DateTime _startTime = DateTime.MinValue;
     private bool _isWorkingTime;
-    private List<DateTime> _pauseStartTimes;
+    private List<DateTime> _breakTimes;
 
-    public WorkTimeJob(IConfiguration config)
+    public WorkTimeJob(IConfiguration config, CommandLineOptions options )
     {
         _config = config;
         var settings = _config.GetSection("WorkTimeSets").Get<WorkTimeModel>();
         if (!Double.TryParse(settings?.WorkTime, out _workTime)) { throw new ArgumentException("Invalid value for WorkTime"); }
         if (!Double.TryParse(settings?.BreakTime, out _breakTime)) { throw new ArgumentException("Invalid value for BreakTime"); }
-        if (!Double.TryParse(settings?.NecessaryBreakAfterTime, out _necessaryBreakAfterTime)) { throw new ArgumentException("Invalid value for NecessaryBreakAfterTime"); } 
+        if (!Double.TryParse(settings?.NecessaryBreakAfterTime, out _necessaryBreakAfterTime)) { throw new ArgumentException("Invalid value for NecessaryBreakAfterTime"); }
+
+        if (options.StartTime != null && !DateTime.TryParseExact(options.StartTime, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _startTime)) { throw new ArgumentException("Invalid value for WorkTime"); }
+
+        _breakTimes = options.BreakTimes.ToDateTimeList() ?? new List<DateTime>();
     }
 
     public void Run()
     {
-        _startTime = DateTime.Now;
-        _pauseStartTimes = new List<DateTime>();
+        _startTime = _startTime != DateTime.MinValue ? _startTime : DateTime.Now;
         _isWorkingTime = true;
         var workTime = TimeSpan.FromHours(_workTime);
-        var totalBreakTime = TimeSpan.Zero;
+        var totalBreakTime = CalculateTotalBreakTime();
+        DateTime endTime = CalculateEndTime(workTime, totalBreakTime);
 
-        DateTime endTime = _startTime + workTime + totalBreakTime;
+        if (totalBreakTime > TimeSpan.Zero)
+        {
+            Console.WriteLine($"Es wurden bereits Pausen von {totalBreakTime.TotalMinutes}min Länge gemacht. Status: {(_isWorkingTime ? PhaseKind.Work.GetDescription() : PhaseKind.Break.GetDescription())}");
+        }
 
-        Console.Write($"Start der Arbeit:");
-        Console.ForegroundColor = ConsoleColor.DarkBlue;
-        Console.Write($"{_startTime:HH:mm}h");
-        Console.ResetColor();
-        Console.Write($". Voraussichtlicher Feierabend um");
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.Write($" {endTime:HH:mm}h");
-        Console.ResetColor();
-        Console.Write(".\n");
+        ConsoleRenderer.DrawStartWork(_startTime, endTime);
 
-        while (DateTime.Now < _startTime + workTime)
-        {            
-            CalculateWorkingDay(workTime, ref totalBreakTime, ref endTime);
+        while (DateTime.Now < endTime)
+        {
+            if (_isWorkingTime)
+            {
+                TimeSpan remainingTime = endTime - DateTime.Now;
+                ConsoleRenderer.DrawProgressbar(_workTime, remainingTime);
+            }
+
+            ProcessKeyboardInput(ref totalBreakTime, ref workTime, ref endTime);
 
             Thread.Sleep(1000);
         }
-    }
-
-    private void CalculateWorkingDay(TimeSpan workTime, ref TimeSpan totalBreakTime, ref DateTime endTime)
-    {
-        if (_isWorkingTime)
-        {
-            TimeSpan remainingTime = _startTime + workTime - DateTime.Now;
-            DrawProgressbar(remainingTime);
-        }
-        
-            ProcessKeyboardInput(ref totalBreakTime, ref workTime, ref endTime);
-    }
+    }   
 
     private void ProcessKeyboardInput(ref TimeSpan totalBreakTime, ref TimeSpan workTime, ref DateTime endTime)
     {
@@ -69,81 +68,65 @@ public class WorkTimeJob
             {
                 if (_isWorkingTime)
                 {
+                    // start break
                     _isWorkingTime = false;
-                    _pauseStartTimes.Add(DateTime.Now);
-                    Console.WriteLine($"\nStart der Pause: {DateTime.Now:HH:mm}h.");
+                    _breakTimes.Add(DateTime.Now);
+                    Console.WriteLine($"\nStart der {PhaseKind.Break.GetDescription()}: {DateTime.Now:HH:mm}h.");
                 }
                 else
                 {
-                    EndPause(ref totalBreakTime, ref workTime, ref endTime);
+                    // end break
+                    _breakTimes.Add(DateTime.Now);
+                    totalBreakTime = CalculateTotalBreakTime();
+                    endTime = CalculateEndTime(workTime, totalBreakTime);
+                    ConsoleRenderer.DrawEndOfBreak(endTime);
+
                 }
             }
         }
-    }
+    }    
 
-    private void EndPause(ref TimeSpan totalBreakTime, ref TimeSpan workTime, ref DateTime endTime)
+    private TimeSpan CalculateTotalBreakTime()
     {
-        DateTime lastPauseStartTime = _pauseStartTimes.LastOrDefault();
-        if (lastPauseStartTime != default)
+        if (_breakTimes is null || !_breakTimes.Any()) { return TimeSpan.Zero; }
+
+        var result = TimeSpan.Zero;
+
+        if (_breakTimes.Count % 2 == 0)
         {
-            var pauseDuration = DateTime.Now - lastPauseStartTime;
-            totalBreakTime += pauseDuration;
+            for (int i = 0; i < _breakTimes.Count - 1; i += 2)
+            {
+                result += _breakTimes[i + 1] - _breakTimes[i];
+            }
+
             _isWorkingTime = true;
-
-            endTime = CalculateEndTime(totalBreakTime, workTime);
-
-            Console.Write($"\nDie Arbeit wurde {DateTime.Now:HH:mm}h wieder aufgenommen. Voraussichtlicher Feierabend um");
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.Write($" {endTime:HH:mm}h.\n");
-            Console.ResetColor();
-        }
-    }
-
-    private DateTime CalculateEndTime(TimeSpan totalBreakTime, TimeSpan workTime)
-    {   
-        return workTime > TimeSpan.FromHours(_necessaryBreakAfterTime)
-            ? _startTime + workTime + totalBreakTime
-            : _startTime + workTime + TimeSpan.FromMinutes(_breakTime);
-    }
-
-    private void DrawProgressbar(TimeSpan remainingTime)
-    {
-        Console.CursorVisible = false;
-        Double progress = 100 - (remainingTime.TotalSeconds / (_workTime * 3600)) * 100;
-
-        if (progress < 0) { progress = 0; }
-        progress = Math.Min(125, progress);
-
-        // Erstellen der Fortschrittsanzeige
-        Int32 widthOfProgressbar = 40; // Breite des Fortschrittsbalkens
-        Int32 completedWidth = (Int32)Math.Floor(progress / 100 * widthOfProgressbar);
-        Int32 remainingWidth = widthOfProgressbar - completedWidth < 0 
-                                ? 0
-                                : widthOfProgressbar - completedWidth;
-
-        Console.Write("[");        
-
-        if (completedWidth > widthOfProgressbar)
-        {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.Write($"{new String('=', widthOfProgressbar)}");
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.Write($"{new String('=', completedWidth - widthOfProgressbar)}");
         }
         else
         {
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.Write($"{new String('=', completedWidth)}");
+            for (int i = 0; i < _breakTimes.Count - 1; i += 2)
+            {
+                result += _breakTimes[i + 1] - _breakTimes[i];
+            }
+
+            _isWorkingTime = false;
         }
 
-        Console.ResetColor();
-        Console.Write($"{new String('-', remainingWidth)}]");
-        Console.ForegroundColor = progress >= 100.0 
-            ? ConsoleColor.Green 
-            : ConsoleColor.Red;
-        Console.Write($" {progress:0.0}%\r"); 
-        Console.ResetColor();
-        Console.CursorLeft = 0;
-        Console.CursorVisible= true;
+        return result;
     }
+
+    private DateTime CalculateEndTime(TimeSpan workTime, TimeSpan totalBreakTime)
+    {      
+        if (workTime < TimeSpan.FromHours(_necessaryBreakAfterTime))
+        {
+            return _startTime + workTime;
+        }
+
+        if (workTime > TimeSpan.FromHours(_necessaryBreakAfterTime) &&
+                totalBreakTime < TimeSpan.FromMinutes(_breakTime))
+        {
+            return _startTime + workTime + TimeSpan.FromMinutes(_breakTime);
+        }
+
+        return _startTime + workTime + totalBreakTime; 
+    } 
 }

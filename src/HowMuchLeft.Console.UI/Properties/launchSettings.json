@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "HowMuchLeft.ConsoleUI": {
+      "commandName": "Project",
+      "commandLineArgs": "-s 07:22 -b 12:00,12:30"
+    }
+  }
+}
