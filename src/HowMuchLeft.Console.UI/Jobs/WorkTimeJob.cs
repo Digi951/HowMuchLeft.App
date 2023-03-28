@@ -45,7 +45,10 @@ public sealed class WorkTimeJob
 
         ConsoleRenderer.DrawStartWork(_startTime, endTime);
 
-        while (DateTime.Now < endTime)
+        TimeSpan timeElapsed = DateTime.Now - _startTime;
+
+        // Runs if the workingday is short than 10 hours
+        while (timeElapsed.TotalHours < 10)
         {
             if (_isWorkingTime)
             {
@@ -80,7 +83,6 @@ public sealed class WorkTimeJob
                     totalBreakTime = CalculateTotalBreakTime();
                     endTime = CalculateEndTime(workTime, totalBreakTime);
                     ConsoleRenderer.DrawEndOfBreak(endTime);
-
                 }
             }
         }
@@ -92,24 +94,12 @@ public sealed class WorkTimeJob
 
         var result = TimeSpan.Zero;
 
-        if (_breakTimes.Count % 2 == 0)
+        for (int i = 0; i < _breakTimes.Count - 1; i += 2)
         {
-            for (int i = 0; i < _breakTimes.Count - 1; i += 2)
-            {
-                result += _breakTimes[i + 1] - _breakTimes[i];
-            }
-
-            _isWorkingTime = true;
+            result += _breakTimes[i + 1] - _breakTimes[i];
         }
-        else
-        {
-            for (int i = 0; i < _breakTimes.Count - 1; i += 2)
-            {
-                result += _breakTimes[i + 1] - _breakTimes[i];
-            }
 
-            _isWorkingTime = false;
-        }
+        _isWorkingTime = _breakTimes.Count % 2 == 0;
 
         return result;
     }
