@@ -7,6 +7,9 @@ using System.Globalization;
 using HowMuchLeft.ConsoleUI.Configuration;
 using System.Reflection;
 
+Console.WindowHeight = 6;
+Console.WindowWidth = 80;
+
 using IHost host = CreateHostbuilder(args).Build();
 using var scope = host.Services.CreateScope(); ;
 
