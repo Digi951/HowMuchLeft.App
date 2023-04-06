@@ -1,9 +1,14 @@
-﻿using HowMuchLeft.ConsoleUI.Enums;
+﻿using HowMuchLeft.ConsoleUI.Calculations;
+using HowMuchLeft.ConsoleUI.Enums;
 using HowMuchLeft.ConsoleUI.Extensions;
 
 namespace HowMuchLeft.ConsoleUI.Renderer;
 public static class ConsoleRenderer
 {
+    /// <summary>
+    ///     Draws a sentence with the end of break time
+    /// </summary>
+    /// <param name="endTime"></param>
     public static void DrawEndOfBreak(DateTime endTime)
     {
         Console.Write($"\nDie {PhaseKind.Work.GetDescription()} wurde {DateTime.Now:HH:mm}h wieder aufgenommen. Voraussichtlicher Feierabend um");
@@ -12,6 +17,11 @@ public static class ConsoleRenderer
         Console.ResetColor();
     }
 
+    /// <summary>
+    ///     Draws a sentence with the starting time
+    /// </summary>
+    /// <param name="startTime"></param>
+    /// <param name="endTime"></param>
     public static void DrawStartWork(DateTime startTime, DateTime endTime)
     {
         Console.Write($"Start der {PhaseKind.Work.GetDescription()}:");
@@ -25,17 +35,19 @@ public static class ConsoleRenderer
         Console.Write(".\n");
     }
 
+    /// <summary>
+    ///     Draws a progressbar. It shows also the current percentage and the remaining hours or the overtime.
+    /// </summary>
+    /// <param name="workTime"></param>
+    /// <param name="remainingTime"></param>
     public static void DrawProgressbar(Double workTime, TimeSpan remainingTime)
     {
-        const Int32 SECONDS_TO_HOURS = 3600;
+        const Int32 SECONDS_HOURS_FACTOR = 3600;
         const Int32 PERCENT = 100;
         const Int32 MAX_OF_WORKTIME_IN_PERCENT = 125;
 
         Console.CursorVisible = false;
-        Double progress = PERCENT - (remainingTime.TotalSeconds / (workTime * SECONDS_TO_HOURS)) * PERCENT;
-
-        if (progress < 0) { progress = 0; }
-        progress = Math.Min(MAX_OF_WORKTIME_IN_PERCENT, progress);
+        Double progress = ProgressCalculations.CalculateProgress(workTime, remainingTime, SECONDS_HOURS_FACTOR, PERCENT, MAX_OF_WORKTIME_IN_PERCENT);
 
         const Int32 WIDTH_OF_PROGRESSBAR = 40;
         Int32 completedWidth = (Int32)Math.Floor(progress / PERCENT * WIDTH_OF_PROGRESSBAR);
@@ -63,9 +75,14 @@ public static class ConsoleRenderer
         Console.ForegroundColor = progress >= 100.0
             ? ConsoleColor.Green
             : ConsoleColor.Red;
-        Console.Write($" {progress:0.0}%\r");
+        Console.Write($" {progress:0.0}%");
+        Console.Write($" ({remainingTime:h\\:mm\\h})\r");
+
         Console.ResetColor();
+
         Console.CursorLeft = 0;
         Console.CursorVisible = true;
     }
+
+    
 }

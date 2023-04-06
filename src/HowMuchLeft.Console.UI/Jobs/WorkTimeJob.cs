@@ -47,8 +47,7 @@ public sealed class WorkTimeJob
         ConsoleRenderer.DrawStartWork(_startTime, endTime);
 
         TimeSpan timeElapsed = DateTime.Now - _startTime;
-
-        // Runs if the workingday is short than 10 hours
+        
         while (timeElapsed.TotalHours < 10)
         {
             if (_isWorkingTime)
