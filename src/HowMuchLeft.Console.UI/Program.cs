@@ -25,6 +25,7 @@ try
 catch (Exception ex)
 {
     Console.WriteLine(ex.Message);
+    Console.ReadKey();
 }
 
 static IHostBuilder CreateHostbuilder(String[] args)

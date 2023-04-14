@@ -23,9 +23,9 @@ public sealed class WorkTimeJob
         _config = config;
         var settings = _config.GetSection("WorkTimeSets").Get<WorkTimeModel>();
 
-        _breakTime = GetValueOrDefault(settings?.BreakTime, "Invalid value for BreakTime");
-        _necessaryBreakAfterTime = GetValueOrDefault(settings?.NecessaryBreakAfterTime, $"Invalid value for {nameof(settings.WorkTime)}");
-        _startTime = GetDateTimeValueOrDefault(options.StartTime, "HH:mm", $"Invalid value for {nameof(options.StartTime)}");
+        _breakTime = GetValueOrDefault(settings?.BreakTime, $"Invalid value for {nameof(settings.BreakTime)}. Expected value in format '30.0'.");
+        _necessaryBreakAfterTime = GetValueOrDefault(settings?.NecessaryBreakAfterTime, $"Invalid value for {nameof(settings.WorkTime)}. Expected value in format '8.0'.");
+        _startTime = GetDateTimeValueOrDefault(options.StartTime, "HH:mm", $"Invalid value for {nameof(options.StartTime)}. Expected value in format '08:00'.");
         _workTime = GetValueOrDefault(options?.WorkTime, $"Invalid value for {nameof(options.WorkTime)}"); 
         _breakTimes = options?.BreakTimes?.ToDateTimeList() ?? new List<DateTime>();
     }       
