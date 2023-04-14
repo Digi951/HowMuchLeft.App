@@ -1,14 +1,17 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using HowMuchLeft.ConsoleUI.Jobs;
 using System.Globalization;
 using HowMuchLeft.ConsoleUI.Configuration;
 using System.Reflection;
+using System.Runtime.InteropServices;
 
-Console.WindowHeight = 6;
-Console.WindowWidth = 80;
+if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+{
+    Console.WindowHeight = 6;
+    Console.WindowWidth = 80;
+}
 
 using IHost host = CreateHostbuilder(args).Build();
 using var scope = host.Services.CreateScope(); ;
@@ -41,6 +44,6 @@ static IHostBuilder CreateHostbuilder(String[] args)
         .ConfigureServices((hostingContext, services) =>
         {
             services.AddSingleton<CommandLineOptions>(CommandLine.Parser.Default.ParseArguments<CommandLineOptions>(args).Value);
-            services.AddSingleton<WorkTimeJob>();            
+            services.AddSingleton<WorkTimeJob>();
         });
 }
