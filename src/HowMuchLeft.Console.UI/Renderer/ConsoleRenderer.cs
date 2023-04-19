@@ -9,9 +9,11 @@ public static class ConsoleRenderer
     ///     Draws a sentence with the end of break time
     /// </summary>
     /// <param name="endTime"></param>
-    public static void DrawEndOfBreak(DateTime endTime)
+    public static void DrawEndOfBreak(DateTime endTime, Boolean calculatedEndTime = true)
     {
-        Console.Write($"\nDie {PhaseKind.Work.GetDescription()} wurde {DateTime.Now:HH:mm}h wieder aufgenommen. Voraussichtlicher Feierabend um");
+        String prefix = calculatedEndTime ? "Voraussichtlicher" : "Geplanter";
+        Console.Write($"\nDie {PhaseKind.Work.GetDescription()} wurde {DateTime.Now:HH:mm}h wieder aufgenommen. {prefix} Feierabend um");
+
         Console.ForegroundColor = ConsoleColor.Green;
         Console.Write($" {endTime:HH:mm}h.\n");
         Console.ResetColor();
@@ -22,17 +24,48 @@ public static class ConsoleRenderer
     /// </summary>
     /// <param name="startTime"></param>
     /// <param name="endTime"></param>
-    public static void DrawStartWork(DateTime startTime, DateTime endTime)
+    /// <param name="calculatedEndTime"></param>
+    public static void DrawStartWork(DateTime startTime, DateTime endTime, Boolean calculatedEndTime = true)
     {
         Console.Write($"Start der {PhaseKind.Work.GetDescription()}:");
         Console.ForegroundColor = ConsoleColor.DarkBlue;
         Console.Write($"{startTime:HH:mm}h");
         Console.ResetColor();
-        Console.Write($". Voraussichtlicher Feierabend um");
+
+        String prefix = calculatedEndTime ? "Voraussichtlicher" : "Geplanter";
+        Console.Write($". {prefix} Feierabend um");
+
         Console.ForegroundColor = ConsoleColor.Green;
         Console.Write($" {endTime:HH:mm}h");
         Console.ResetColor();
         Console.Write(".\n");
+    }
+
+    /// <summary>
+    ///     Checks if there breaks have already been made and draws the total break time.
+    /// </summary>
+    /// <param name="totalBreakTime"></param>
+    /// <param name="isWorkingTime"></param>
+    public static void DrawBreakingTimeAfterStartup(TimeSpan totalBreakTime, Boolean isWorkingTime)
+    {
+        if (totalBreakTime > TimeSpan.Zero)
+        {
+            String workingPhase = isWorkingTime ? PhaseKind.Work.GetDescription() : PhaseKind.Break.GetDescription();
+
+            Console.WriteLine($"Es wurden bereits Pausen von {totalBreakTime.TotalMinutes}min Länge gemacht. Status: {workingPhase}");
+        }
+    }
+
+    /// <summary>
+    ///  Draws a notification, that the break has already been exceeded
+    /// </summary>
+    /// <param name="breakTimeExeeded"></param>
+    public static void DrawExceededBreakTime(Boolean breakTimeExeeded, Double breakTime)
+    {
+        if (!breakTimeExeeded)
+        {
+            Console.WriteLine($"Die Pause dauert bereits {breakTime} Minuten an!");
+        }
     }
 
     /// <summary>

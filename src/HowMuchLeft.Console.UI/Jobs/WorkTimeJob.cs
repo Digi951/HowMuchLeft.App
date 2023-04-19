@@ -14,9 +14,12 @@ public sealed class WorkTimeJob
     private readonly Double _workTime;
     private readonly Double _breakTime;
     private readonly Double _necessaryBreakAfterTime;
+    private readonly DateTime? _endOfWork;
     private DateTime _startTime = DateTime.MinValue;
     private Boolean _isWorkingTime;
     private List<DateTime> _breakTimes;
+
+    private const Int32 MAX_WORKING_TIME = 10;
 
     public WorkTimeJob(IConfiguration config, CommandLineOptions options )
     {
@@ -25,37 +28,46 @@ public sealed class WorkTimeJob
 
         _breakTime = GetValueOrDefault(settings?.BreakTime, $"Invalid value for {nameof(settings.BreakTime)}. Expected value in format '30.0'.");
         _necessaryBreakAfterTime = GetValueOrDefault(settings?.NecessaryBreakAfterTime, $"Invalid value for {nameof(settings.WorkTime)}. Expected value in format '8.0'.");
+
         _startTime = GetDateTimeValueOrDefault(options.StartTime, "HH:mm", $"Invalid value for {nameof(options.StartTime)}. Expected value in format '08:00'.");
-        _workTime = GetValueOrDefault(options?.WorkTime, $"Invalid value for {nameof(options.WorkTime)}"); 
+        _workTime = GetValueOrDefault(options?.WorkTime, $"Invalid value for {nameof(options.WorkTime)}");
+        _endOfWork = GetDateTimeValueOrDefault(options.EndOfWork, "HH:mm", $"Invalid value for {nameof(options.EndOfWork)}. Expected value in format '16:00'.");
         _breakTimes = options?.BreakTimes?.ToDateTimeList() ?? new List<DateTime>();
     }       
 
     public void Run()
     {
-        _startTime = _startTime != DateTime.MinValue ? _startTime : DateTime.Now;
         _isWorkingTime = true;
-        TimeSpan workTime = TimeSpan.FromHours(_workTime);
+
+        _startTime = _startTime != DateTime.MinValue 
+                    ? _startTime 
+                    : DateTime.Now;
+
+        TimeSpan workTime = _endOfWork.HasValue && _endOfWork != DateTime.MinValue
+                            ? TimeCalculations.CalculateWorkTime(_startTime, _endOfWork.Value)
+                            : TimeCalculations.CalculateWorkTime(_workTime);
+
         TimeSpan totalBreakTime = TimeCalculations.CalculateTotalBreakTime(_breakTimes, ref _isWorkingTime);
-        DateTime endTime = TimeCalculations.CalculateEndTime(workTime, _startTime, _breakTime, _necessaryBreakAfterTime, totalBreakTime);
 
-        if (totalBreakTime > TimeSpan.Zero)
-        {
-            Console.WriteLine($"Es wurden bereits Pausen von {totalBreakTime.TotalMinutes}min Länge gemacht. Status: {(_isWorkingTime ? PhaseKind.Work.GetDescription() : PhaseKind.Break.GetDescription())}");
-        }
+        DateTime endTime = _endOfWork != DateTime.MinValue
+                            ? _endOfWork.Value
+                            : TimeCalculations.CalculateEndTime(workTime, _startTime, _breakTime, _necessaryBreakAfterTime, totalBreakTime);
 
-        ConsoleRenderer.DrawStartWork(_startTime, endTime);
+        ConsoleRenderer.DrawBreakingTimeAfterStartup(totalBreakTime, _isWorkingTime);
+
+        ConsoleRenderer.DrawStartWork(_startTime, endTime, calculatedEndTime: _endOfWork is null);
 
         TimeSpan timeElapsed = DateTime.Now - _startTime;
         
-        Boolean breakTimeExeeded = false;
+        Boolean breakTimeExceeded = false;
 
-        while (timeElapsed.TotalHours < 10)
+        while (timeElapsed.TotalHours < MAX_WORKING_TIME)
         {
             if (_isWorkingTime)
             {
                 TimeSpan remainingTime = endTime - DateTime.Now;
-                ConsoleRenderer.DrawProgressbar(_workTime, remainingTime);
-                breakTimeExeeded = false;
+                ConsoleRenderer.DrawProgressbar(workTime.TotalHours, remainingTime);
+                breakTimeExceeded = false;
             }
 
             WaitForKeyboardInput(ref totalBreakTime, ref workTime, ref endTime);
@@ -66,16 +78,13 @@ public sealed class WorkTimeJob
             if (!_isWorkingTime && lastStartBreakTime != default && currentBreakTime > _breakTime)
             {
                 Console.Beep();
-                if (!breakTimeExeeded)
-                {
-                    Console.WriteLine($"Die Pause dauert bereits {_breakTime} Minuten an!");
-                }
-                breakTimeExeeded = true;
+                ConsoleRenderer.DrawExceededBreakTime(breakTimeExceeded, _breakTime);
+                breakTimeExceeded = true;
             }
 
             Thread.Sleep(1000);
         }
-    }
+    } 
 
     private static DateTime GetDateTimeValueOrDefault(String? value, String format, String errorMessage)
     {
@@ -89,16 +98,34 @@ public sealed class WorkTimeJob
         return result;
     }
 
-    private static Double GetValueOrDefault(String? value, String? errorMessage)
+    private static T GetValueOrDefault<T>(String? value, String? errorMessage) where T : struct, IConvertible
     {
-        Double result = default;
+        T result = default;
 
-        if (value != null && !Double.TryParse(value, out result))
+        if (value != null && !TryParse<T>(value, out result))
         {
             throw new ArgumentException(errorMessage);
         }
 
         return result;
+    }
+
+    private static bool TryParse<T>(string value, out T result) where T : struct, IConvertible
+    {
+        Boolean success = false;
+        result = default;
+
+        try
+        {
+            result = (T)Convert.ChangeType(value, typeof(T));
+            success = true;
+        }
+        catch (Exception)
+        {
+            // ignore and return false
+        }
+
+        return success;
     }
 
     private void WaitForKeyboardInput(ref TimeSpan totalBreakTime, ref TimeSpan workTime, ref DateTime endTime)
