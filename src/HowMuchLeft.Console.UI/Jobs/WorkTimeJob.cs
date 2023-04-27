@@ -61,7 +61,7 @@ public sealed class WorkTimeJob
         
         Boolean breakTimeExceeded = false;
 
-        while (timeElapsed.TotalHours < MAX_WORKING_TIME)
+        while (timeElapsed.TotalHours < MAX_WORKING_TIME + totalBreakTime.TotalHours)
         {
             if (_isWorkingTime)
             {
@@ -84,6 +84,9 @@ public sealed class WorkTimeJob
 
             Thread.Sleep(1000);
         }
+
+        Console.WriteLine("Erlaubte Arbeitszeit wurde überschritten. Die Anwendung wird geschlossen!");
+        Console.ReadKey();
     } 
 
     private static DateTime GetDateTimeValueOrDefault(String? value, String format, String errorMessage)
