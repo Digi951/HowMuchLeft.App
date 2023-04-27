@@ -3,7 +3,7 @@
 public static class TimeCalculations
 {
     /// <summary>
-    ///     Calculates the toral break time during the entire day
+    ///     Calculates the total break time during the entire day
     /// </summary>
     /// <param name="breakTimes"></param>
     /// <param name="isWorkingTime"></param>
@@ -14,7 +14,7 @@ public static class TimeCalculations
 
         var result = TimeSpan.Zero;
 
-        for (int i = 0; i < breakTimes.Count - 1; i += 2)
+        for (Int32 i = 0; i < breakTimes.Count - 1; i += 2)
         {
             result += breakTimes[i + 1] - breakTimes[i];
         }

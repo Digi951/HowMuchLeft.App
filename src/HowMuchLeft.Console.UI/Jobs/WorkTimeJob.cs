@@ -26,11 +26,11 @@ public sealed class WorkTimeJob
         _config = config;
         var settings = _config.GetSection("WorkTimeSets").Get<WorkTimeModel>();
 
-        _breakTime = GetValueOrDefault(settings?.BreakTime, $"Invalid value for {nameof(settings.BreakTime)}. Expected value in format '30.0'.");
-        _necessaryBreakAfterTime = GetValueOrDefault(settings?.NecessaryBreakAfterTime, $"Invalid value for {nameof(settings.WorkTime)}. Expected value in format '8.0'.");
+        _breakTime = GetValueOrDefault<Double>(settings?.BreakTime, $"Invalid value for {nameof(settings.BreakTime)}. Expected value in format '30.0'.");
+        _necessaryBreakAfterTime = GetValueOrDefault<Double>(settings?.NecessaryBreakAfterTime, $"Invalid value for {nameof(settings.WorkTime)}. Expected value in format '8.0'.");
 
         _startTime = GetDateTimeValueOrDefault(options.StartTime, "HH:mm", $"Invalid value for {nameof(options.StartTime)}. Expected value in format '08:00'.");
-        _workTime = GetValueOrDefault(options?.WorkTime, $"Invalid value for {nameof(options.WorkTime)}");
+        _workTime = GetValueOrDefault<Double>(options?.WorkTime, $"Invalid value for {nameof(options.WorkTime)}");
         _endOfWork = GetDateTimeValueOrDefault(options.EndOfWork, "HH:mm", $"Invalid value for {nameof(options.EndOfWork)}. Expected value in format '16:00'.");
         _breakTimes = options?.BreakTimes?.ToDateTimeList() ?? new List<DateTime>();
     }       
@@ -55,7 +55,7 @@ public sealed class WorkTimeJob
 
         ConsoleRenderer.DrawBreakingTimeAfterStartup(totalBreakTime, _isWorkingTime);
 
-        ConsoleRenderer.DrawStartWork(_startTime, endTime, calculatedEndTime: _endOfWork is null);
+        ConsoleRenderer.DrawStartWork(_startTime, endTime, calculatedEndTime: _endOfWork == default(DateTime));
 
         TimeSpan timeElapsed = DateTime.Now - _startTime;
         
@@ -98,7 +98,7 @@ public sealed class WorkTimeJob
         return result;
     }
 
-    private static T GetValueOrDefault<T>(String? value, String? errorMessage) where T : struct, IConvertible
+    private static T GetValueOrDefault<T>(String? value, String? errorMessage) where T : struct, IConvertible, IComparable, IFormattable
     {
         T result = default;
 
@@ -110,7 +110,7 @@ public sealed class WorkTimeJob
         return result;
     }
 
-    private static bool TryParse<T>(string value, out T result) where T : struct, IConvertible
+    private static Boolean TryParse<T>(string value, out T result) where T : struct, IConvertible
     {
         Boolean success = false;
         result = default;
